@@ -2,6 +2,7 @@
 https://adventofcode.com/2024/day/1
 --- Day 1: Historian Hysteria ---
  */
+use std::collections::HashMap;
 use std::io;
 use std::iter::zip;
 use std::str::FromStr;
@@ -42,8 +43,30 @@ fn main() {
     list_a.sort();
     list_b.sort();
 
+    // Count the occurence of each unique "location ids" in each list
+    let mut count_a: HashMap<i32, usize> = HashMap::new();
+    for x in &list_a {
+        *count_a.entry(*x).or_default() += 1;
+    }
+
+    let mut count_b: HashMap<i32, usize> = HashMap::new();
+    for x in &list_b {
+        *count_b.entry(*x).or_default() += 1;
+    }
+
     let diffs = zip(list_a, list_b).map(|(a, b)| (a - b).abs());
     let total_distance: i32 = diffs.sum();
 
-    print!("total = {:?}", total_distance);
+    println!("total difference = {total_distance}");
+
+    // Could be done with a 1-liner fold() but too unreadable with
+    // all the necessary type conversion
+    let mut score: i64 = 0;
+    for (k, v) in count_a.into_iter() {
+        let m1: i64 = (k as i64) * (v as i64);
+        let m2: i64 = *count_b.entry(k).or_default() as i64;
+        score += m1 * m2;
+    }
+
+    println!("Similarity score = {score}");
 }
