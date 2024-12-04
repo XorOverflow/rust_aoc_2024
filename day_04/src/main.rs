@@ -14,8 +14,7 @@ fn count_xmas(grid: &Grid) -> usize {
     let height = grid.len() - 4;
     let width = grid[0].len() - 4;
 
-    let searched = vec![vec!['X', 'M', 'A', 'S'],
-                        vec!['S', 'A', 'M', 'X']];
+    let searched = vec![vec!['X', 'M', 'A', 'S'], vec!['S', 'A', 'M', 'X']];
 
     // Look for the searched string (to simulate
     // bacward and forward search) on right, down, and
@@ -24,8 +23,8 @@ fn count_xmas(grid: &Grid) -> usize {
     // Used to display the result at the end
     let debug = false;
     let mut debug_grid = grid.clone();
-    
-    let mut found:usize = 0;
+
+    let mut found: usize = 0;
     for x in 0..width {
         for y in 0..height {
             // hackish way to count the number of found
@@ -35,21 +34,21 @@ fn count_xmas(grid: &Grid) -> usize {
             for s in &searched {
                 // right search
                 for k in 0..s.len() {
-                    if s[k] as u8 != grid[y][x+k] {
+                    if s[k] as u8 != grid[y][x + k] {
                         potential_found -= 1;
                         break;
                     }
                 }
                 // down search
-                for k in 0..s.len() { 
-                    if s[k] as u8 != grid[y+k][x] {
+                for k in 0..s.len() {
+                    if s[k] as u8 != grid[y + k][x] {
                         potential_found -= 1;
                         break;
                     }
                 }
                 // diagonal search down-right
                 for k in 0..s.len() {
-                    if s[k] as u8 != grid[y+k][x+k] {
+                    if s[k] as u8 != grid[y + k][x + k] {
                         potential_found -= 1;
                         break;
                     }
@@ -58,7 +57,7 @@ fn count_xmas(grid: &Grid) -> usize {
                 if y >= 3 {
                     potential_found += 1;
                     for k in 0..s.len() {
-                        if s[k] as u8 != grid[y-k][x+k] {
+                        if s[k] as u8 != grid[y - k][x + k] {
                             potential_found -= 1;
                             break;
                         }
@@ -80,14 +79,69 @@ fn count_xmas(grid: &Grid) -> usize {
             eprintln!("{}", String::from_utf8(k).expect("error"));
         }
     }
-    
+
+    return found;
+}
+
+fn count_cross_mas(grid: &Grid) -> usize {
+    // get the real size without padding.
+    let height = grid.len() - 4;
+    let width = grid[0].len() - 4;
+
+    let searched = vec![vec!['M', 'A', 'S'], vec!['S', 'A', 'M']];
+
+    // Used to display the result at the end
+    let debug = false;
+    let mut debug_grid = grid.clone();
+
+    let mut found: usize = 0;
+    for x in 1..width {
+        for y in 1..height {
+            // Both arms have two possible way (MAS or SAM).
+            // Both arms must be non-0 for a X.
+            let mut potential_found_right = 2;
+            let mut potential_found_left = 2;
+
+            for s in &searched {
+                // right down search
+                for k in 0..s.len() {
+                    if s[k] as u8 != grid[y - 1 + k][x - 1 + k] {
+                        potential_found_right -= 1;
+                        break;
+                    }
+                }
+                // left down search
+                for k in 0..s.len() {
+                    if s[k] as u8 != grid[y + 1 - k][x - 1 + k] {
+                        potential_found_left -= 1;
+                        break;
+                    }
+                }
+            }
+
+            if potential_found_left != 0 && potential_found_right != 0 {
+                found += 1;
+                if debug {
+                    eprintln!("Found at {x},{y}");
+                    debug_grid[y][x] = format!("*").as_bytes()[0];
+                }
+            }
+        }
+    }
+
+    if debug {
+        eprintln!("debug found:");
+        for k in debug_grid {
+            eprintln!("{}", String::from_utf8(k).expect("error"));
+        }
+    }
+
     return found;
 }
 
 fn main() {
-
     let mut grid = Grid::new();
-    
+
     let mut input = String::new();
     loop {
         match io::stdin().read_line(&mut input) {
@@ -122,5 +176,9 @@ fn main() {
 
     // part 1
     let count = count_xmas(&grid);
+    println!("Part1 = {count}");
+
+    // part 2
+    let count = count_cross_mas(&grid);
     println!("Part1 = {count}");
 }
