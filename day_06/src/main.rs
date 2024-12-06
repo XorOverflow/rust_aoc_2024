@@ -9,6 +9,7 @@ use std::io;
 // Grid struct copied as-is from my last-year aoc 2023 day 17
 
 // A custom 2D array more friendly than a Vec<Vec<T>>
+#[derive(Clone)]
 struct Grid<T> {
     width: usize,
     height: usize,
@@ -117,10 +118,10 @@ impl Direction {
 
 impl<T> Grid<T> {
     // Return Some(newx,newy) after moving by direction, else None if out-of-bounds
+    #[rustfmt::skip]
     fn get_next_coordinates(&self, p: (usize, usize), d: Direction) -> Option<(usize, usize)> {
         let x = p.0;
         let y = p.1;
-        #[rustfmt_skip]
         match d {
             Left =>  if x == 0             { None } else { Some((x-1, y)) },
             Right => if x+1 >= self.width  { None } else { Some((x+1, y)) },
@@ -167,6 +168,110 @@ fn count_positions(map: &Grid<bool>, start: (usize, usize)) -> usize {
     count_visit
 }
 
+fn u8FromDirection(d: Direction) -> u8 {
+    match d {
+        Up => 0b0001,
+        Right => 0b0010,
+        Down => 0b0100,
+        Left => 0b1000,
+    }
+}
+
+// Return true if the path from a starting position leads to an
+// infinite loop
+fn check_has_loop(map: &Grid<bool>, start: (usize, usize)) -> bool {
+    let mut pos = start;
+    let mut direction = Up;
+
+    // Compared to Part 1, here we note the direction used on previous
+    // pass in a location. An infinite loop is detected as soon
+    // as the same direction is used again. Simply crossing it
+    // by a different direction is not enough.
+    let mut travel_map = Grid::<u8>::new(map.width, map.height, 0);
+    travel_map.set(start.0, start.1, u8FromDirection(direction));
+
+    loop {
+        if let Some(new_coord) = map.get_next_coordinates(pos, direction) {
+            if *map.get(new_coord.0, new_coord.1) {
+                // would hit an obstacle
+                direction = direction.rotate_right();
+            } else {
+                pos = new_coord;
+                // already visited this space in the same direction ?
+                let oldDir = *travel_map.get(pos.0, pos.1);
+                // bitmap test
+                if oldDir & u8FromDirection(direction) != 0 {
+                    return true;
+                }
+                travel_map.set(pos.0, pos.1, oldDir | u8FromDirection(direction));
+            }
+        } else {
+            // went out of the map
+            break;
+        }
+    }
+
+    false
+}
+
+fn count_obstructions(map: &Grid<bool>, start: (usize, usize)) -> usize {
+    let mut pos = start;
+    let mut direction = Up;
+
+    // First step is to perform the same path tracing as part 1,
+    // as a basis for searching  possible obstruction locations.
+
+    let mut travel_map = Grid::<bool>::new(map.width, map.height, false);
+    travel_map.set(start.0, start.1, true);
+
+    loop {
+        if let Some(new_coord) = map.get_next_coordinates(pos, direction) {
+            if *map.get(new_coord.0, new_coord.1) {
+                // would hit an obstacle
+                direction = direction.rotate_right();
+            } else {
+                pos = new_coord;
+                // First time visiting this space ?
+                if !*travel_map.get(pos.0, pos.1) {
+                    travel_map.set(pos.0, pos.1, true);
+                }
+            }
+        } else {
+            // went out of the map
+            break;
+        }
+    }
+
+    // Now test all possible single-obstructions coordinates and simulate
+    // new path.
+    // No need to iterate on full map coordinates, only those in the
+    // initial path have any effect.
+
+    // for debug
+    let mut valid_obstruction_map = Grid::<bool>::new(map.width, map.height, false);
+
+    let mut valid_obstructions = 0;
+    for x in 0..map.width {
+        for y in 0..map.height {
+            if (x, y) == start || !*travel_map.get(x, y) {
+                continue;
+            }
+            let mut obstruction_map = map.clone();
+            obstruction_map.set(x, y, true);
+            if check_has_loop(&obstruction_map, start) {
+                valid_obstructions += 1;
+                valid_obstruction_map.set(x, y, true);
+            }
+        }
+    }
+
+    // if debug
+    eprintln!("Map of new inf-loop obstructions:");
+    valid_obstruction_map.pretty_print_bool();
+
+    valid_obstructions
+}
+
 fn main() {
     let mut map = Vec::<Vec<bool>>::new();
     let mut start: Option<(usize, usize)> = None;
@@ -211,4 +316,6 @@ fn main() {
     }
 
     println!("Part 1 = {}", count_positions(&map, start.unwrap()));
+
+    println!("Part 2 = {}", count_obstructions(&map, start.unwrap()));
 }
