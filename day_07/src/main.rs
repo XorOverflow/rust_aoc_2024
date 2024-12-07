@@ -66,8 +66,77 @@ fn sum_total_calibration(input: &Vec<Equation>) -> usize {
         .fold(0_usize, |a, e| a + e.value)
 }
 
-fn count_2(input: &Vec<Equation>) -> usize {
-    input[0].operands.len()
+// Part 2 is a slight variation of part 1.
+// Code has been duplicated to keep the history of part 1 solving code.
+// brute forcing is not twice as long but SQUARED as long.
+// By skipping easy-to-solve equations from part 1, this still
+// takes 2 minutes 17s (instead of 0.1s)
+
+// One source of slowness is that each combination recomputes everything
+// instead of using recursive call with tree exploration and keeping
+// the start of the equation already computed.
+
+fn concat_digits(a: usize, b: usize) -> usize {
+    // Avoid the obvious hack of re-parsing the string comming from format!() both numbers.
+    let digits = b.ilog10() + 1;
+    let r = a * 10_usize.pow(digits) + b;
+
+    //eprintln!("Concat {a} || {b} => {r}");
+    r
+}
+
+// operators_map is now encoding +, * or "||", using 2 bits instead of 1.
+// To avoid tedious generation of only valid bits, we map two different
+// bit value to the same || operator when iterating over all possible u32
+// But this makes the brute-forcing longer for nothing.
+fn compute_equation_with_concat(operands: &Vec<usize>, mut operators_map: u32) -> usize {
+    let mut result: usize = operands[0];
+    for v in operands.iter().skip(1) {
+        let bit = operators_map & 0b11;
+        match bit {
+            0b00 => result = result + v,
+            0b01 => result = result * v,
+            0b10 | 0b11 => result = concat_digits(result, *v),
+            _ => panic!("impossible bit value"),
+        }
+        operators_map = operators_map >> 2;
+    }
+
+    result
+}
+
+fn can_solve_with_concat(eq: &Equation) -> bool {
+    // First try the easy (fast) way of part 1
+    let operators_map: u32 = (1 << (eq.operands.len())) - 1;
+    for k in 0..=operators_map {
+        if compute_equation_with_map(&eq.operands, k) == eq.value {
+            return true;
+        }
+    }
+    // If this fails, brute force more
+    // Compared with part 1 we have twice as many bits.
+    let operators_concat: u32 = (1 << 2 * (eq.operands.len())) - 1;
+    for k in 0..=operators_concat {
+        if compute_equation_with_concat(&eq.operands, k) == eq.value {
+            if DEBUG {
+                eprintln!("Solved by concat only {:?} with operators map {:b}", eq, k);
+            }
+            return true;
+        }
+    }
+
+    if DEBUG {
+        eprintln!("Cannot solve at all {:?}", eq);
+    }
+    // No found combination
+    false
+}
+
+fn sum_total_with_concat(input: &Vec<Equation>) -> usize {
+    input
+        .iter()
+        .filter(|e| can_solve_with_concat(e))
+        .fold(0_usize, |a, e| a + e.value)
 }
 
 fn main() {
@@ -99,5 +168,5 @@ fn main() {
 
     println!("Part 1 = {}", sum_total_calibration(&parsed));
 
-    println!("Part 2 = {}", count_2(&parsed));
+    println!("Part 2 = {}", sum_total_with_concat(&parsed));
 }
