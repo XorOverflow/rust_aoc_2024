@@ -68,8 +68,57 @@ fn count_antinode_locations(input: &HashMap<char, Vec<Coord>>, bound: Coord) -> 
     locations.len()
 }
 
-fn count_2() -> usize {
-    0
+// part 2
+
+// Instead of the first two antinodes at same distances,
+// count also as it repeats until out of bound.
+// Text is not clear about "exactly in line" but sample
+// indicates same periodic behavior, no need to draw
+// a straight line on all integral coordinates.
+fn set_freq_harmonics_locations(
+    antennas: &Vec<Coord>,
+    locations: &mut HashSet<Coord>,
+    bound: Coord,
+) {
+    // iterate over all (unordered) pairs of antenna
+    for a in 0..antennas.len() - 1 {
+        for b in a + 1..antennas.len() {
+            let ca = antennas[a];
+            let cb = antennas[b];
+            let delta = cb - ca;
+            let mut harmonics = ca;
+            loop {
+                // add the antenna itself (0th repeatition)
+                if in_map_bound(harmonics, bound) {
+                    locations.insert(harmonics);
+                } else {
+                    break;
+                }
+                // and move to next antinode position after.
+                harmonics = harmonics - delta;
+            }
+
+            harmonics = cb;
+            loop {
+                if in_map_bound(harmonics, bound) {
+                    locations.insert(harmonics);
+                } else {
+                    break;
+                }
+                harmonics = harmonics + delta;
+            }
+        }
+    }
+}
+
+fn count_harmonics_locations(input: &HashMap<char, Vec<Coord>>, bound: Coord) -> usize {
+    let mut locations = HashSet::<Coord>::new();
+
+    for freq in input.values() {
+        set_freq_harmonics_locations(freq, &mut locations, bound);
+    }
+
+    locations.len()
 }
 
 fn main() {
@@ -118,5 +167,8 @@ fn main() {
 
     println!("Part 1 = {}", count_antinode_locations(&antenna_map, bound));
 
-    println!("Part 2 = {}", count_2());
+    println!(
+        "Part 2 = {}",
+        count_harmonics_locations(&antenna_map, bound)
+    );
 }
