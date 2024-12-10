@@ -75,8 +75,45 @@ fn trailhead_total_scores(map: &Vec<Vec<usize>>) -> usize {
     scores
 }
 
-fn count_2(input: &Vec<Vec<usize>>) -> usize {
-    input[0].len()
+// Recursive sum of rest of trail or trail forks.
+// actually the same as the first buggy version as part 1 before accounting for multiple paths... WTF
+fn trail_rating(map: &Vec<Vec<usize>>, x: usize, y: usize) -> usize {
+    let mut score: usize = 0;
+    let elevation = map[y][x];
+
+    // Found end
+    if elevation == 9 {
+        //eprintln!("Found trail end at {x},{y}");
+        return 1;
+    }
+
+    for (dx, dy) in [(0, 1), (0, -1), (1, 0), (-1, 0)] {
+        let next_x = (x as isize + dx) as usize;
+        let next_y = (y as isize + dy) as usize;
+
+        if map[next_y][next_x] == elevation + 1 {
+            score += trail_rating(map, next_x, next_y);
+        }
+    }
+    score
+}
+
+fn trailhead_total_ratings(map: &Vec<Vec<usize>>) -> usize {
+    let width = map[0].len() - 1;
+    let height = map.len() - 1;
+
+    let mut ratings: usize = 0;
+
+    for y in 1..height {
+        for x in 1..width {
+            // trail Head (starting point)
+            if map[y][x] == 0 {
+                ratings += trail_rating(map, x, y);
+            }
+        }
+    }
+
+    ratings
 }
 
 fn main() {
@@ -108,5 +145,5 @@ fn main() {
 
     println!("Part 1 = {}", trailhead_total_scores(&parsed));
 
-    println!("Part 2 = {}", count_2(&parsed));
+    println!("Part 2 = {}", trailhead_total_ratings(&parsed));
 }
