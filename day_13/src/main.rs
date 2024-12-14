@@ -78,6 +78,20 @@ fn minimal_tokens_for_prizes(machines: &Vec<ClawMachine>) -> isize {
     tokens
 }
 
+fn minimal_tokens_for_prizes_mega(machines: &Vec<ClawMachine>) -> isize {
+    let mut tokens = 0;
+    for m in machines {
+        let mut mega = m.clone();
+        mega.prize.0 += 10000000000000;
+        mega.prize.1 += 10000000000000;
+        if let Some(t) = get_token_cost(&mega) {
+            tokens += t;
+        }
+    }
+
+    tokens
+}
+
 fn main() {
     // This regex covers both the Button and the Prize subtly different formats
     let re_xy = Regex::new(r".*: X.([0-9]+), Y.([0-9]+)").unwrap();
@@ -121,5 +135,5 @@ fn main() {
     println!("Part 1 = {}", minimal_tokens_for_prizes(&claw_machines));
 
     // Part 2
-    println!("Part 2 = ?");
+    println!("Part 2 = {}", minimal_tokens_for_prizes_mega(&claw_machines));
 }
