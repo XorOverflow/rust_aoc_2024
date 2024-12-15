@@ -77,6 +77,65 @@ fn count_quadrants(input: &Vec<Robot>, elapse: isize) -> usize {
     quadrant_a * quadrant_b * quadrant_c * quadrant_d
 }
 
+// Just print to visually find the tree.
+// Iterating for the first 100/300 didnt show anything visually.
+// SO an heuristic search is to look for a straigh vertical pattern
+// if there is a visible "trunk" near the bottom half and middle
+// of the screen.
+// Actually found in easter-egg but not as a trunk, it was
+// more a filling or framing.
+fn display_evolution(input: &Vec<Robot>, elapse: isize) {
+    let evolved: Vec<Robot> = input
+        .iter()
+        .map(|r| Robot {
+            p: (
+                positive_mod(r.p.0 + r.v.0 * elapse, GRID_WIDTH),
+                positive_mod(r.p.1 + r.v.1 * elapse, GRID_HEIGHT),
+            ),
+            v: r.v,
+        })
+        .collect();
+
+    let mut map = Vec::<[char; GRID_WIDTH as usize]>::new();
+    let empty = [' '; GRID_WIDTH as usize];
+    for _ in 0..GRID_HEIGHT {
+        map.push(empty.clone());
+    }
+
+    for r in evolved {
+        let x = r.p.0 as usize;
+        let y = r.p.1 as usize;
+        let s = &mut map[y];
+        s[x] = '*';
+    }
+
+    let mut possible_trunk = false;
+    'outer: for x in (GRID_WIDTH_MIDDLE - 20)..GRID_WIDTH_MIDDLE {
+        let mut count_vertical = 0;
+        for y in GRID_HEIGHT_MIDDLE..GRID_HEIGHT {
+            let s = &map[y as usize];
+            if s[x as usize] == '*' {
+                count_vertical += 1;
+            }
+
+            if count_vertical > 15 {
+                possible_trunk = true;
+                break 'outer;
+            }
+        }
+    }
+
+    if !possible_trunk {
+        return;
+    }
+
+    println!(" ------------------- At iteration {elapse} -------------------------- ");
+    for l in map {
+        let s: String = l.iter().collect();
+        println!("{s}");
+    }
+}
+
 fn main() {
     let mut robots = Vec::<Robot>::new();
 
@@ -100,4 +159,12 @@ fn main() {
     }
 
     println!("Part 1 = {}", count_quadrants(&robots, 100));
+
+    // Actually part 2 is not "do it 1 billion time" at all...
+    // But it was near 8000.
+
+    println!("Part 2: display debug and search for the tree");
+    for k in 1..32000 {
+        display_evolution(&robots, k);
+    }
 }
