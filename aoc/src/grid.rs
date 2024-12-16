@@ -93,8 +93,19 @@ impl<T: std::clone::Clone + std::fmt::Display> Grid<T> {
 
 impl<T: std::clone::Clone> Grid<T> {
     /// Pretty-print the array with any user-supplied function to convert
-    /// between the type and one char (not simply a "Display" trait)
-    pub fn pretty_print_lambda(&self, f: &dyn Fn(T) -> char) {
+    /// between the type and a single char (not simply a "Display" trait)
+    pub fn pretty_print_lambda_char(&self, f: &dyn Fn(T) -> char) {
+        eprintln!("[{},{}] = ", self.width, self.height);
+        for y in 0..self.height {
+            let s: String = (0..self.width).map(|x| f(self.get(x, y))).collect();
+            eprintln!("[{}] ", s);
+        }
+    }
+
+    /// Pretty-print the array with any user-supplied function to convert
+    /// between the type and any string (should all be the same size for
+    /// alignment)
+    pub fn pretty_print_lambda(&self, f: &dyn Fn(T) -> String) {
         eprintln!("[{},{}] = ", self.width, self.height);
         for y in 0..self.height {
             let s: String = (0..self.width).map(|x| f(self.get(x, y))).collect();
@@ -238,14 +249,16 @@ mod test {
 
         // & before lambda required for compilation, as its a &dyn,
         // passed borrowed and not copied.
-        grid.pretty_print_lambda(&|e: Elmt| match e.dir {
-             0 => '*',
-             1 => '>',
+        grid.pretty_print_lambda_char(&|e: Elmt| match e.dir {
+            0 => '*',
+            1 => '>',
             -1 => '<',
-             2 => '2',
-             4 => 'A',
+            2 => '2',
+            4 => 'A',
             -4 => 'V',
             _ => '?',
         });
+
+        grid.pretty_print_lambda(&|e: Elmt| format!("{:02}_{}|", e.v, e.dir));
     }
 }
