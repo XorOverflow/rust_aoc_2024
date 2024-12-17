@@ -3,6 +3,7 @@ https://adventofcode.com/2024/day/17
 --- Day 17: Chronospatial Computer ---
  */
 
+use std::collections::HashSet;
 use std::io;
 use std::io::prelude::*;
 use std::str::FromStr;
@@ -305,7 +306,6 @@ fn main() {
     // not really tractable either.
     // Actual result            107416732707226 so there was one magnitude error...
 
-    
     if false {
         brute_force(&mut machine);
     }
@@ -352,26 +352,28 @@ fn main() {
 
     let mut valid_a = Vec::<usize>::new();
 
-    //valid_a.push(0); // Just to avoid special_casing the first digit
-    valid_a.push(42567035290); // This seed is the decimal version of the truncated octal value common to all results
-                               // ( 0x42567035290) found by initial algorithm but which were "too high", generating all 14 first digits.
-                               // This leads to the correct result 107416732707226 (oct 0x3033075014424632) instead
-                               // of the one found by first algo,  107416748386714 (oct 0x3033075110264632)
+    valid_a.push(0); // Just to avoid special_casing the first digit
 
-    // Still searching why the standard starting point overshoots
-
-    // loop search takes 7s from starting at 0, and 20s starting from the "magic" seed.
-    
     let mut range_factor = 1;
     let bits = 8;
 
     for digit in 1..=machine.program.len() {
+        // the set sum { valid + k }  leads to many duplicates,
+        // this hashset speeds up iteration from 1min15 to 7s.
+        let mut checked = HashSet::<usize>::new();
         let mut next_valid_a = Vec::<usize>::new();
 
         for prev in &valid_a {
-            // "256" was too low (no matching digit after 7), 512 is goodenough.
-            for k in 0..512 {
+            // "512" was too low to actually cover all possible source of
+            // bit modification from A to the output, 1024 covers all 10 bits
+            // and find the correct answer.
+            for k in 0..1024 {
                 let a = *prev + k * range_factor;
+                if !checked.insert(a) {
+                    // this value was already tested.
+                    continue;
+                }
+
                 machine.reset_with_register(a);
                 let quine = if digit == machine.program.len() {
                     // For final loop we require exact match, not a prefix
@@ -397,16 +399,16 @@ fn main() {
         println!("Previous lowest A was {}", valid_a[0]);
 
         // Collect our different candidates for next digit.
-        // Since we have overlaps (k covers more than just the new bits factor),
-        // need to deduplicate first. Also it will sort for final result.
-        next_valid_a.sort();
-        next_valid_a.dedup();
+        // the hashset already avoid duplications.
         valid_a = next_valid_a;
 
         range_factor *= bits;
     }
 
+    valid_a.sort();
+
     println!("All valid_A = {:?}", valid_a);
+    // We need only the first one, check just a few for display.
     valid_a.truncate(10);
 
     println!("Part 2: Valid A for complete quine ?");
