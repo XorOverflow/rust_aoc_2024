@@ -72,7 +72,7 @@ fn find_cheat_cuts(track: &Grid<usize>, min_time: usize) -> usize {
                 // but that's what needed to match the sample.
                 let saved_time = p.0.abs_diff(p.1) - 2;
                 if saved_time >= min_time {
-                    eprintln!("Shortcut at {x},{y} saves {saved_time}");
+                    //eprintln!("Shortcut at {x},{y} saves {saved_time}");
                     count += 1;
                 }
             }
@@ -98,6 +98,77 @@ fn get_adjacent_tracks(track: &Grid<usize>, x: usize, y: usize) -> Vec<(usize, u
     }
 
     list
+}
+
+// part 2 is an extension of part 1 on the max distance
+// (Manhattan) between cheat entry (on the track) and exit.
+// Since only start and end defines a cheat, unicity is get by
+// forcing the timestamp of start<end (compared to get_adjacent_tracks
+// that was unordered around a center)
+
+// From a track starting point x,y, count exit of cheat at distance at most
+// 'dist' (2 in part1, 20 in part 2) that save at least "save" time.
+// Does not count a "start" in double if the x,y is an exit:
+// computed save time must be positive.
+fn get_valid_ends_count(
+    track: &Grid<usize>,
+    x: usize,
+    y: usize,
+    dist_max: usize,
+    save_min: usize,
+) -> usize {
+    let start_time = track.get(x, y);
+    if start_time == 0 {
+        // This starts from inside the walls.
+        return 0;
+    }
+
+    let mut total_valid = 0;
+    let x = x as isize;
+    let y = y as isize;
+    let half: isize = dist_max as isize;
+    for kx in (x - half)..=(x + half) {
+        for ky in (y - half)..=(y + half) {
+            let cheat_dist = manhattan_dist(x, y, kx, ky);
+            // We could make a more intelligent loop
+            // that covers exactly the distance instead
+            // of checking and eliminating the 4 corners,
+            // but it would be more tedious
+            if cheat_dist > dist_max {
+                continue;
+            }
+            // This will often overflow the boundary near the border,
+            // so expected to check.
+            if let Some(end_time) = track.checked_get(kx, ky) {
+                if end_time == 0 {
+                    // ends into a wall
+                    continue;
+                }
+                if end_time >= start_time + cheat_dist + save_min {
+                    //let saved_time = end_time - cheat_dist - start_time;
+                    //eprintln!("({x},{y}) -> ({kx},{ky}) : saves {saved_time} at distance {cheat_dist}");
+                    total_valid += 1;
+                }
+            }
+        }
+    }
+
+    total_valid
+}
+
+fn manhattan_dist(x1: isize, y1: isize, x2: isize, y2: isize) -> usize {
+    x2.abs_diff(x1) + y2.abs_diff(y1)
+}
+
+fn find_super_cheat_cuts(track: &Grid<usize>, max_cheat: usize, min_time: usize) -> usize {
+    let mut count = 0;
+
+    for x in 1..track.width - 1 {
+        for y in 1..track.height - 1 {
+            count += get_valid_ends_count(track, x, y, max_cheat, min_time);
+        }
+    }
+    count
 }
 
 fn main() {
@@ -137,6 +208,19 @@ fn main() {
     eprintln!("Total track time is {}", track.get(end.0, end.1) - 1);
 
     // different settings for sample and real input
-    let pico_to_save = if track.width > 15 { 100 } else { 1 };
+    let pico_to_save = if track.width > 15 { 100 } else { 15 };
     println!("Part 1 = {}", find_cheat_cuts(&track, pico_to_save));
+
+    // unit test: algo for part 2 should find the same result
+    // for part 1 with adequate settings
+    println!(
+        "Part 1bis = {}",
+        find_super_cheat_cuts(&track, 2, pico_to_save)
+    );
+
+    let pico_to_save = if track.width > 15 { 100 } else { 72 };
+    println!(
+        "Part 2 = {}",
+        find_super_cheat_cuts(&track, 20, pico_to_save)
+    );
 }
