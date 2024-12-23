@@ -50,6 +50,104 @@ fn tuples_of_3_computers(matrix: &Grid<bool>) -> Vec<(usize, usize, usize)> {
     result
 }
 
+// Between two row of the adjacency matrix,
+// return the number of elements (columns) where they differ.
+fn get_row_distance<T: std::cmp::PartialEq>(a: &[T], b: &[T]) -> usize {
+    let mut diff = 0;
+    if a.len() != b.len() {
+        panic!("Can't compare slices of different len");
+    }
+
+    for k in 0..a.len() {
+        if a[k] != b[k] {
+            diff += 1;
+        }
+    }
+
+    diff
+}
+
+fn find_biggest_tuple(matrix: &Grid<bool>, names: &Vec<String>) -> Vec<usize> {
+    let m = matrix.width;
+
+    // Count how much connectivy each node has
+    // XXX Funny inputs... they all have the exact same connectivity count.
+    // 4 for the sample, 13 for the problem input.
+    /*
+        let mut connectivy_count = Vec::<usize>::with_capacity(matrix.width);
+
+
+
+        for a in 0..m {
+            let mut connect = 0;
+            for b in 0..m {
+                if matrix.get(a,b) {
+                    connect += 1;
+                }
+            }
+            connectivy_count.push(connect);
+        }
+
+        let mut max_connectivity = connectivy_count.clone();
+        max_connectivity.sort();
+
+        eprintln!("Connects = {:?}", max_connectivity);
+    */
+    // Add the diagonal (self-connectivity) for easier processing
+    let mut matrix = matrix.clone();
+    for a in 0..m {
+        matrix.set(a, a, true);
+    }
+
+    matrix.pretty_print_bool();
+
+    // We suppose that the biggest connected group will be connected
+    // only to itself, except for one outside connection for each member
+    // (all other groups will have more outside connections)
+
+    // This group will have the property that all their rows
+    // (or columns) will be identical in the matrix, except for 1 element.
+
+    // (Initially the assumption was that the group did not have any
+    // external connection at all but this failed)
+
+    'search: for a in 0..m {
+        let row_a = matrix.get_row_slice(a);
+        let mut outliers = 0;
+        // Construct the connected group by omiting outliers.
+        let mut group = Vec::<usize>::new();
+        group.push(a);
+        for b in 0..m {
+            if a != b && row_a[b] {
+                // a and b are connected
+                let row_b = matrix.get_row_slice(b);
+                let diff = get_row_distance(row_a, row_b);
+                let na = &names[a];
+                let nb = &names[b];
+                eprintln!("diff {a}/{b} ({na}/{nb}) = {diff}");
+                // We accept at most 1 difference in the group (double it
+                // because if some ma in a is missing in b,
+                // then another mb in b is missing in a too.)
+                if diff > 2 {
+                    // but a and b don't have the same exact connection set
+                    outliers += 1;
+                    if outliers >= 2 {
+                        continue 'search;
+                    }
+                } else {
+                    group.push(b);
+                    eprintln!("{a} and {b} are similar");
+                }
+            }
+        }
+        // stable group found
+
+        return group;
+    }
+
+    panic!("Error: did not find any stable group");
+}
+
 fn main() {
     let mut computers = HashMap::<String, usize>::new();
     let mut computers_names = Vec::<String>::new(); // reverse of hash
@@ -110,4 +208,18 @@ fn main() {
     }
 
     println!("Part 1 = {count_triplet_with_t}");
+
+    eprintln!("Names index = {:?}", computers_names);
+
+    let max_tuple = find_biggest_tuple(&matrix, &computers_names);
+    eprintln!("Biggest tuple is {:?}", max_tuple);
+    let mut names: Vec<String> = max_tuple
+        .iter()
+        .map(|i| computers_names[*i].clone())
+        .collect();
+    names.sort();
+    eprintln!("Names = {:?}", names);
+
+    let password: String = names.join(",");
+    println!("Part 2 = {password}");
 }
