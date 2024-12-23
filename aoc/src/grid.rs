@@ -59,6 +59,14 @@ impl<T: std::clone::Clone> Grid<T> {
         }
     }
 
+    // return a slice of size "width" of all elements of row Y
+    pub fn get_row_slice(&self, y: usize) -> &[T] {
+        if y >= self.height {
+            panic!("array row {y} out of bounds");
+        }
+        &self.s[y * self.width..y * self.width + self.height]
+    }
+
     pub fn get_mut(&mut self, x: isize, y: isize) -> Option<&mut T> {
         if x < 0 || y < 0 || x as usize >= self.width || y as usize >= self.height {
             None
