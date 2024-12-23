@@ -29,6 +29,50 @@ fn sum_2000_secrets(buyer_secrets: &Vec<usize>) -> usize {
     total
 }
 
+fn get_2000_prices(seed: usize) -> Vec<usize> {
+    let mut r = Vec::<usize>::with_capacity(2000);
+    let mut i = seed;
+    for _ in 0..2000 {
+        let price = i % 10;
+        r.push(price);
+        i = iter_pseudorand(i);
+    }
+
+    r
+}
+
+fn get_changes(secrets: &Vec<usize>) -> Vec<isize> {
+    secrets
+        .windows(2)
+        .map(|w| w[1] as isize - w[0] as isize)
+        .collect()
+}
+
+fn get_sequences(changes: &Vec<isize>) -> Vec<[isize; 4]> {
+    // Disapointingly, windows(4).collect() or even map(|w| *w)
+    // gets a compilation error with "size not known at compile time"
+    // despite windows(4) being clearly known as a &[isize;4] and not just a &[isize]
+    changes
+        .windows(4)
+        .map(|w| [w[0], w[1], w[2], w[3]])
+        .collect()
+}
+
+fn find_best_common_sequence(buyers: &Vec<usize>) -> usize {
+    let buyers_prices: Vec<Vec<usize>> = buyers.iter().map(|b| get_2000_prices(*b)).collect();
+    let buyers_changes: Vec<Vec<isize>> = buyers_prices
+        .iter()
+        .map(|prices| get_changes(prices))
+        .collect();
+    let buyers_sequences: Vec<Vec<[isize; 4]>> = buyers_changes
+        .iter()
+        .map(|changes| get_sequences(changes))
+        .collect();
+    /* XXX FIXME TODO */
+
+    42
+}
+
 fn main() {
     let mut buyer_secrets = Vec::<usize>::new();
 
@@ -39,6 +83,7 @@ fn main() {
     }
 
     println!("Part 1 = {}", sum_2000_secrets(&buyer_secrets));
+    println!("Part 2 = {}", find_best_common_sequence(&buyer_secrets));
 }
 
 #[test]
