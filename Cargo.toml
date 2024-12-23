@@ -15,5 +15,5 @@ members = [ "aoc",
     "day_10",
     "day_11",
     "day_12",
-    "day_13", "day_14", "day_17", "day_19", "day_20", "day_21", "day_22",
+    "day_13", "day_14", "day_17", "day_19", "day_20", "day_21", "day_22", "day_23",
 ]
