@@ -25,8 +25,8 @@ fn floodfill(map: &Grid<char>, region: &mut Grid<u32>, x: usize, y: usize, v: u3
     let mut x2 = x;
 
     while x1 >= 1 {
-        x1 -= 1;
-        if map.get(x1, y) == c {
+        if map.get(x1 - 1, y) == c {
+            x1 -= 1;
             region.set(x1, y, v);
         } else {
             break;
@@ -34,13 +34,16 @@ fn floodfill(map: &Grid<char>, region: &mut Grid<u32>, x: usize, y: usize, v: u3
     }
 
     while x2 < map.width - 1 {
-        x2 += 1;
-        if map.get(x2, y) == c {
+        if map.get(x2 + 1, y) == c {
+            x2 += 1;
             region.set(x2, y, v);
         } else {
             break;
         }
     }
+
+    // x1 and x2 are now exactly the first and last x of this line
+    // with the same plot character (no overrun)
 
     // Recurse into top and bottom lines (if not already done)
     if y >= 1 {
@@ -198,7 +201,4 @@ fn main() {
 
     eprintln!("Map has {max} contiguous regions");
     println!("Part 1 = {}", fence_cost(&regions, max));
-
-    // 1320594 "Your answer is too high"
-    // ¯\_(ツ)_/¯
 }
