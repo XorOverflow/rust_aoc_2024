@@ -86,6 +86,20 @@ impl<T: std::clone::Clone> Grid<T> {
     }
 }
 
+impl<T: PartialEq + std::clone::Clone> Grid<T> {
+    /// Check if the grid values at the two different coordinates are equal.
+    /// Any out-of-bound coordinates simply return false.
+    pub fn values_equal(&self, x1: isize, y1: isize, x2:isize, y2:isize) -> bool {
+        if let Some(v1) = self.checked_get(x1, y1) {
+            if let Some(v2) = self.checked_get(x2, y2) {
+                return v1 == v2;
+            }
+        }
+
+        false
+    }
+}
+
 impl<T: std::clone::Clone + std::fmt::Display> Grid<T> {
     /// Pretty-print the array with default Display trait
     pub fn pretty_print(&self) {

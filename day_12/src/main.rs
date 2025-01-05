@@ -3,6 +3,8 @@ https://adventofcode.com/2024/day/12
 --- Day 12: Garden Groups ---
  */
 
+use aoc::args;
+use aoc::colors;
 use aoc::grid::{Grid, GridBuilder};
 use std::io;
 use std::io::prelude::*;
@@ -23,8 +25,8 @@ fn floodfill(map: &Grid<char>, region: &mut Grid<u32>, x: usize, y: usize, v: u3
     let mut x2 = x;
 
     while x1 >= 1 {
-        x1 -= 1;
-        if map.get(x1, y) == c {
+        if map.get(x1 - 1, y) == c {
+            x1 -= 1;
             region.set(x1, y, v);
         } else {
             break;
@@ -32,13 +34,16 @@ fn floodfill(map: &Grid<char>, region: &mut Grid<u32>, x: usize, y: usize, v: u3
     }
 
     while x2 < map.width - 1 {
-        x2 += 1;
-        if map.get(x2, y) == c {
+        if map.get(x2 + 1, y) == c {
+            x2 += 1;
             region.set(x2, y, v);
         } else {
             break;
         }
     }
+
+    // x1 and x2 are now exactly the first and last x of this line
+    // with the same plot character (no overrun)
 
     // Recurse into top and bottom lines (if not already done)
     if y >= 1 {
@@ -74,11 +79,6 @@ fn map_to_unique_regions(map: &Grid<char>) -> (Grid<u32>, u32) {
             if regions.get(x, y) == 0 {
                 max += 1;
                 floodfill(&map, &mut regions, x, y, max);
-                /*
-                For debugging construction of the floodfill (it's ok)
-                eprintln!("=========================");
-                regions.pretty_print_lambda(&|v| if v == 0 { "  ".to_string() } else { format!("{}.", v%10) } );
-                 */
             }
         }
     }
@@ -86,19 +86,45 @@ fn map_to_unique_regions(map: &Grid<char>) -> (Grid<u32>, u32) {
     (regions, max)
 }
 
+fn region_to_color(r: u32) -> &'static str {
+    let reg = (r % 15) as usize;
+    if reg < 7 {
+        colors::FG_COLORS[reg + 1]
+    } else {
+        colors::FG_BRIGHT_COLORS[reg - 7]
+    }
+}
+
+// Print the map in color
+fn debug_print_regions(map: &Grid<char>, regions: &Grid<u32>) {
+    // Each original "char" of the map is colored with the specifig region number
+    // of this plot (can be different than a similar char from a different plot).
+    // Just avoid dark black for my black background terminal; still use pure white.
+    // FIXME: using a 4-color theorem or other to pick distinct colors on contiguous
+    // regions is a different problem !
+    let formatter = &|c, r| {
+        let color = region_to_color(r);
+        format!("{color}{c}")
+    };
+    map.pretty_print_lambda_with_overlay(regions, formatter);
+}
+
 #[derive(Clone)]
 struct Region {
     area: usize,
     perimeter: usize,
+    sides: usize,
 }
 
-fn fence_cost(map: &Grid<u32>, max: u32) -> usize {
+// return the price for (part1, part2)
+fn fence_cost(map: &Grid<u32>, max: u32) -> (usize, usize) {
     let mut regions = Vec::<Region>::new();
     regions.resize(
         1 + max as usize,
         Region {
             area: 0,
             perimeter: 0,
+            sides: 0,
         },
     );
 
@@ -112,30 +138,62 @@ fn fence_cost(map: &Grid<u32>, max: u32) -> usize {
             let r = &mut regions[v as usize];
             r.area += 1;
             for dir in &cards {
+                // One orthogonal direction to the comparison direction.
+                // This is to check if the "previous" tile (in the orthogonal direction
+                // of this specific cardinal test) is part of the same region and part of the same side.
+                // For counting sides we actually count "corners" (inner or outer) starting each sides.
+                let ortho_card = (dir.1, -dir.0); // left-handed or right-handed is arbitrary here.
                 let x = x as isize;
                 let y = y as isize;
 
-                if let Some(v2) = map.checked_get(x + dir.0, y + dir.1) {
-                    // different plot
-                    if v != v2 {
-                        r.perimeter += 1;
-                    }
-                } else {
-                    // side of map
+                if !map.values_equal(x, y, x + dir.0, y + dir.1) {
                     r.perimeter += 1;
+                    let prev_x = x + ortho_card.0;
+                    let prev_y = y + ortho_card.1;
+                    if !map.values_equal(x, y, prev_x, prev_y) {
+                        // First "outer corner" of this side
+                        r.sides += 1;
+                    } else if map.values_equal(prev_x, prev_y, prev_x + dir.0, prev_y + dir.1) {
+                        // Note that we test for equality here, not inequality.
+                        //  "inner corner" of this side (previous one was adjacent to interior)
+                        r.sides += 1;
+                    }
                 }
             }
         }
     }
 
-    let mut cost = 0;
+    let mut cost1 = 0;
+    let mut cost2 = 0;
+    let mut check_area = 0;
+    let verbose: bool = args::is_verbose();
     for k in 1..=max {
         let r = &regions[k as usize];
-        eprintln!("Region {k} area {}, perimeter {}", r.area, r.perimeter);
-        cost += r.area * r.perimeter;
+        if verbose {
+            eprintln!(
+                "Region {}{k}{} area {}, perimeter {}, sides {}",
+                region_to_color(k),
+                colors::ANSI_RESET,
+                r.area,
+                r.perimeter,
+                r.sides
+            );
+        }
+        cost1 += r.area * r.perimeter;
+        cost2 += r.area * r.sides;
+        check_area += r.area;
+
+        if r.area == 1 {
+            assert_eq!(r.perimeter, 4);
+        }
+        if r.area == 2 {
+            assert_eq!(r.perimeter, 6);
+        }
     }
 
-    cost
+    assert_eq!(check_area, map.width * map.height);
+
+    (cost1, cost2)
 }
 
 fn main() {
@@ -149,13 +207,16 @@ fn main() {
 
     let map = gb.to_grid();
     let (regions, max) = map_to_unique_regions(&map);
+    if args::is_debug() {
+        debug_print_regions(&map, &regions);
+    }
 
     //regions.pretty_print_lambda(&|v| format!("{:03}.", if v > 610 { v } else { 0 } ));
-    regions.pretty_print_lambda(&|v| format!("{:03}.", v));
+    //regions.pretty_print_lambda(&|v| format!("{:03}.", v));
 
     eprintln!("Map has {max} contiguous regions");
-    println!("Part 1 = {}", fence_cost(&regions, max));
+    let costs = fence_cost(&regions, max);
 
-    // "Your answer is too high"
-    // ¯\_(ツ)_/¯
+    println!("Part 1 = {}", costs.0);
+    println!("Part 2 = {}", costs.1);
 }
