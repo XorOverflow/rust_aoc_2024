@@ -113,15 +113,18 @@ fn debug_print_regions(map: &Grid<char>, regions: &Grid<u32>) {
 struct Region {
     area: usize,
     perimeter: usize,
+    sides: usize,
 }
 
-fn fence_cost(map: &Grid<u32>, max: u32) -> usize {
+// return the price for (part1, part2)
+fn fence_cost(map: &Grid<u32>, max: u32) -> (usize, usize) {
     let mut regions = Vec::<Region>::new();
     regions.resize(
         1 + max as usize,
         Region {
             area: 0,
             perimeter: 0,
+            sides: 0,
         },
     );
 
@@ -135,37 +138,49 @@ fn fence_cost(map: &Grid<u32>, max: u32) -> usize {
             let r = &mut regions[v as usize];
             r.area += 1;
             for dir in &cards {
+                // One orthogonal direction to the comparison direction.
+                // This is to check if the "previous" tile (in the orthogonal direction
+                // of this specific cardinal test) is part of the same region and part of the same side.
+                // For counting sides we actually count "corners" (inner or outer) starting each sides.
+                let ortho_card = (dir.1, -dir.0); // left-handed or right-handed is arbitrary here.
                 let x = x as isize;
                 let y = y as isize;
 
-                if let Some(v2) = map.checked_get(x + dir.0, y + dir.1) {
-                    // different plot
-                    if v != v2 {
-                        r.perimeter += 1;
-                    }
-                } else {
-                    // side of map
+                if !map.values_equal(x, y, x + dir.0, y + dir.1) {
                     r.perimeter += 1;
+                    let prev_x = x + ortho_card.0;
+                    let prev_y = y + ortho_card.1;
+                    if !map.values_equal(x, y, prev_x, prev_y) {
+                        // First "outer corner" of this side
+                        r.sides += 1;
+                    } else if map.values_equal(prev_x, prev_y, prev_x + dir.0, prev_y + dir.1) {
+                        // Note that we test for equality here, not inequality.
+                        //  "inner corner" of this side (previous one was adjacent to interior)
+                        r.sides += 1;
+                    }
                 }
             }
         }
     }
 
-    let mut cost = 0;
+    let mut cost1 = 0;
+    let mut cost2 = 0;
     let mut check_area = 0;
     let verbose: bool = args::is_verbose();
     for k in 1..=max {
         let r = &regions[k as usize];
         if verbose {
             eprintln!(
-                "Region {}{k}{} area {}, perimeter {}",
+                "Region {}{k}{} area {}, perimeter {}, sides {}",
                 region_to_color(k),
                 colors::ANSI_RESET,
                 r.area,
-                r.perimeter
+                r.perimeter,
+                r.sides
             );
         }
-        cost += r.area * r.perimeter;
+        cost1 += r.area * r.perimeter;
+        cost2 += r.area * r.sides;
         check_area += r.area;
 
         if r.area == 1 {
@@ -178,7 +193,7 @@ fn fence_cost(map: &Grid<u32>, max: u32) -> usize {
 
     assert_eq!(check_area, map.width * map.height);
 
-    cost
+    (cost1, cost2)
 }
 
 fn main() {
@@ -200,5 +215,8 @@ fn main() {
     //regions.pretty_print_lambda(&|v| format!("{:03}.", v));
 
     eprintln!("Map has {max} contiguous regions");
-    println!("Part 1 = {}", fence_cost(&regions, max));
+    let costs = fence_cost(&regions, max);
+
+    println!("Part 1 = {}", costs.0);
+    println!("Part 2 = {}", costs.1);
 }
