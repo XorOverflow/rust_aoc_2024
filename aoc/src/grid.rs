@@ -1,5 +1,6 @@
 //! "Grid" storage (2D array).
 
+use crate::colors;
 use std::boxed::Box;
 
 // A custom 2D array more friendly than a Vec<Vec<T>>
@@ -118,6 +119,25 @@ impl<T: std::clone::Clone> Grid<T> {
         for y in 0..self.height {
             let s: String = (0..self.width).map(|x| f(self.get(x, y))).collect();
             eprintln!("[{}] ", s);
+        }
+    }
+
+    /// Pretty-print the array with any user-supplied function,
+    /// using a second grid for additional information.
+    /// The two grids must have the same dimension.
+    /// Automatically emits the \esc[0m terminal color reset at end of line.
+    pub fn pretty_print_lambda_with_overlay<T2: std::clone::Clone>(
+        &self,
+        overlay: &Grid<T2>,
+        f: &dyn Fn(T, T2) -> String,
+    ) {
+        assert_eq!((self.width, self.height), (overlay.width, overlay.height));
+        eprintln!("[{},{}] = ", self.width, self.height);
+        for y in 0..self.height {
+            let s: String = (0..self.width)
+                .map(|x| f(self.get(x, y), overlay.get(x, y)))
+                .collect();
+            eprintln!("[{}{}] ", s, colors::ANSI_RESET);
         }
     }
 }

@@ -2,4 +2,6 @@
 //! Contains often reused structures
 //! or methods.
 
+pub mod args;
+pub mod colors;
 pub mod grid;
