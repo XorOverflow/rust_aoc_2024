@@ -3,6 +3,15 @@
 pub const ANSI_RESET: &str = "\x1B[0m";
 
 // black, red, green, yellow, blue, magenta, cyan, white
+pub const BLACK: usize = 0;
+pub const RED: usize = 1;
+pub const GREEN: usize = 2;
+pub const YELLOW: usize = 3;
+pub const BLUE: usize = 4;
+pub const MAGENTA: usize = 5;
+pub const CYAN: usize = 6;
+pub const WHITE: usize = 7;
+
 #[rustfmt::skip]
 pub const FG_COLORS: [&str; 8] = [
     "\x1B[30m",

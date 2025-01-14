@@ -89,7 +89,7 @@ impl<T: std::clone::Clone> Grid<T> {
 impl<T: PartialEq + std::clone::Clone> Grid<T> {
     /// Check if the grid values at the two different coordinates are equal.
     /// Any out-of-bound coordinates simply return false.
-    pub fn values_equal(&self, x1: isize, y1: isize, x2:isize, y2:isize) -> bool {
+    pub fn values_equal(&self, x1: isize, y1: isize, x2: isize, y2: isize) -> bool {
         if let Some(v1) = self.checked_get(x1, y1) {
             if let Some(v2) = self.checked_get(x2, y2) {
                 return v1 == v2;
@@ -143,13 +143,13 @@ impl<T: std::clone::Clone> Grid<T> {
     pub fn pretty_print_lambda_with_overlay<T2: std::clone::Clone>(
         &self,
         overlay: &Grid<T2>,
-        f: &dyn Fn(T, T2) -> String,
+        f: &dyn Fn(T, T2, (usize, usize)) -> String,
     ) {
         assert_eq!((self.width, self.height), (overlay.width, overlay.height));
         eprintln!("[{},{}] = ", self.width, self.height);
         for y in 0..self.height {
             let s: String = (0..self.width)
-                .map(|x| f(self.get(x, y), overlay.get(x, y)))
+                .map(|x| f(self.get(x, y), overlay.get(x, y), (x, y)))
                 .collect();
             eprintln!("[{}{}] ", s, colors::ANSI_RESET);
         }
@@ -219,6 +219,32 @@ impl<T: std::clone::Clone> GridBuilder<T> {
             height: self.height,
             s: self.s.into_boxed_slice(),
         }
+    }
+}
+
+impl GridBuilder<bool> {
+    /// Add a new row at the end of the builder, converting
+    /// chars into a boolean according to a match.
+    /// When it's the first time, this row defines the width
+    /// of the grid. All other rows must have the same width
+    /// else a panic is emitted.
+    pub fn append_char_map(&mut self, line: &str, true_char: char) {
+        let mut bools = Vec::<bool>::with_capacity(self.width);
+        for c in line.chars() {
+            bools.push(c == true_char);
+        }
+        if self.height == 0 {
+            self.width = bools.len();
+        } else if self.width != bools.len() {
+            panic!(
+                "Row of len {} appended to GridBuilder of width {}",
+                bools.len(),
+                self.width
+            );
+        }
+
+        self.height += 1;
+        self.s.extend_from_slice(&bools);
     }
 }
 

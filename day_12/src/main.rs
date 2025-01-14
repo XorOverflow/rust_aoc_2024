@@ -102,7 +102,7 @@ fn debug_print_regions(map: &Grid<char>, regions: &Grid<u32>) {
     // Just avoid dark black for my black background terminal; still use pure white.
     // FIXME: using a 4-color theorem or other to pick distinct colors on contiguous
     // regions is a different problem !
-    let formatter = &|c, r| {
+    let formatter = &|c, r, _xy| {
         let color = region_to_color(r);
         format!("{color}{c}")
     };
