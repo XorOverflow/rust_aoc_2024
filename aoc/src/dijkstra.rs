@@ -9,15 +9,17 @@ pub trait DijkstraController {
     // The node descriptor used by the controller
     // to uniquely identify its nodes.
     // For a grid-like map, this could be the (x,y) coordinate tuple.
-    // It is opaque to the Dijkstra algo itself.
-    type Node;
+    // It is opaque to the Dijkstra algo itself, but needs to
+    // follow some bound/supertraits for hashing and copying.
+    type Node: Copy + Clone + Eq + Hash;
     // Return a descriptor to the starting node
     fn get_starting_node(&self) -> Self::Node;
     // Return a descriptor to the destination node to search.
     // Dijkstra will stop as soon as this node is visited.
+    // (or return a non-existant node if you want to map all the graph)
     fn get_target_node(&self) -> Self::Node;
 
-    // Return a list of neighbors from a starting node,
+    // Return a list of neighbors from a node,
     // along with their distance from it.
     // The controller may returned neighbors that have already
     // been visisted; the Dijkstra algo will filter them out
@@ -42,11 +44,8 @@ pub trait DijkstraController {
 
 // FIXME: need to pass controller as mut only to call "mark_visited_distance"
 // which is not really needed
-fn dijkstra<T: DijkstraController>(controller: &mut T) -> usize
-where
-    T::Node: Copy + Clone + Eq + Hash,
+pub fn dijkstra<T: DijkstraController>(controller: &mut T) -> usize
 {
-    //let mut nodes: Vec<DijkstraNode<T::Node>> = Vec::new();
 
     // List of nodes that have been completely processed and won't be
     // visited again. Used to filter out the return of
