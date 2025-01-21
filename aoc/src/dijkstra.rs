@@ -27,10 +27,16 @@ pub trait DijkstraController {
     fn get_neighbors_distances(&self, node: &Self::Node) -> Vec<(Self::Node, usize)>;
 
     // This function will be called for each node that have been finalized
-    // and have a known minimal distance from the start.
+    // and have a known minimal distance from the start, along with their
+    // previous node (if not unique, it will be arbitrary).
     // It can be an empty function or used only for debugging,
     // the dijkstra algo doesn't care.
-    fn mark_visited_distance(&mut self, node: Self::Node, distance: usize);
+    fn mark_visited_distance(
+        &mut self,
+        node: Self::Node,
+        distance: usize,
+        previous: Option<Self::Node>,
+    );
 }
 
 /*
@@ -44,21 +50,20 @@ pub trait DijkstraController {
 
 // FIXME: need to pass controller as mut only to call "mark_visited_distance"
 // which is not really needed
-pub fn dijkstra<T: DijkstraController>(controller: &mut T) -> usize
-{
-
+pub fn dijkstra<T: DijkstraController>(controller: &mut T) -> usize {
     // List of nodes that have been completely processed and won't be
     // visited again. Used to filter out the return of
     // controller.get_neighbors_distances();
     let mut finalized_nodes = HashSet::<T::Node>::new();
 
     // the "frontier" of unvisited nodes with their current total distance from start
-    let mut unvisited_frontier = HashMap::<T::Node, usize>::new();
+    // and their previous node accounting for this distance.
+    let mut unvisited_frontier = HashMap::<T::Node, (usize, Option<T::Node>)>::new();
 
     // The last set of the abstract algorithm, "all unvisited", is not needed here
     // and is indirectly implemented by the controller with its get_neighbors_distances()
 
-    unvisited_frontier.insert(controller.get_starting_node(), 0);
+    unvisited_frontier.insert(controller.get_starting_node(), (0, None));
 
     let target_node = controller.get_target_node();
 
@@ -67,22 +72,21 @@ pub fn dijkstra<T: DijkstraController>(controller: &mut T) -> usize
         // Get the unvisited node with the smallest tentative distance.
         let shortest_node = unvisited_frontier
             .iter()
-            .min_by(|a, b| a.1.cmp(b.1))
+            .min_by(|a, b| a.1 .0.cmp(&b.1 .0))
             .unwrap();
 
         // Need to copy it to avoid a immutable borrow from line above to block
         // the mutable borrow of following remove_entry()
         let shortest_node = shortest_node.0.clone();
 
-        let Some((current_node, current_distance)) =
+        let Some((current_node, (current_distance, previous_node))) =
             unvisited_frontier.remove_entry(&shortest_node)
         else {
             panic!("Impossible to remove node that was found");
         };
-        //let current_node = current_node.clone();
 
         finalized_nodes.insert(current_node.clone());
-        controller.mark_visited_distance(current_node, current_distance);
+        controller.mark_visited_distance(current_node, current_distance, previous_node);
 
         if current_node == target_node {
             return current_distance;
@@ -97,14 +101,16 @@ pub fn dijkstra<T: DijkstraController>(controller: &mut T) -> usize
             }
             // distance to "node" via "current_node"
             let path_total_distance = dist + current_distance;
-            if let Some(prev_dist) = unvisited_frontier.get_mut(&next_node) {
-                // Update the best distance which was already known
+            if let Some((prev_dist, prev_node)) = unvisited_frontier.get_mut(&next_node) {
+                // Update the best distance which was already known,
+                // and from a better "previous node" (different path)
                 if path_total_distance < *prev_dist {
                     *prev_dist = path_total_distance;
+                    *prev_node = Some(current_node);
                 }
             } else {
                 // New unvisited neighbor, set initial best distance
-                unvisited_frontier.insert(next_node, path_total_distance);
+                unvisited_frontier.insert(next_node, (path_total_distance, Some(current_node)));
             }
         }
     }
@@ -145,7 +151,12 @@ mod test {
             neighbs
         }
 
-        fn mark_visited_distance(&mut self, node: Self::Node, distance: usize) {
+        fn mark_visited_distance(
+            &mut self,
+            node: Self::Node,
+            distance: usize,
+            _previous: Option<Self::Node>,
+        ) {
             self.path.insert(node, distance);
             eprintln!("Visited {node} with distance {distance}");
         }
@@ -191,5 +202,161 @@ mod test {
 
         assert_eq!(d, expected_d);
         assert_eq!(graph.path, expected_paths);
+    }
+
+    use crate::grid::{Grid, GridBuilder};
+
+    struct GridCost {
+        cost: Grid<usize>,
+        // will store distance/path at end of dijkstra
+        path: Grid<(usize, Option<(usize, usize)>)>,
+    }
+
+    impl DijkstraController for GridCost {
+        // The X,Y coordinates in the grid
+        type Node = (usize, usize);
+
+        fn get_starting_node(&self) -> Self::Node {
+            // top-left corner
+            (0, 0)
+        }
+
+        fn get_target_node(&self) -> Self::Node {
+            // bottom-right corner
+            (self.cost.width - 1, self.cost.height - 1)
+        }
+
+        fn get_neighbors_distances(&self, node: &Self::Node) -> Vec<(Self::Node, usize)> {
+            let mut neighbs = Vec::<(Self::Node, usize)>::with_capacity(4);
+            let signed_node: (isize, isize) = (node.0 as isize, node.1 as isize);
+            for delta in vec![(-1, 0), (1, 0), (0, -1), (0, 1)] {
+                let n = (signed_node.0 + delta.0, signed_node.1 + delta.1);
+                if let Some(v) = self.cost.checked_get(n.0, n.1) {
+                    let nnode = (n.0 as usize, n.1 as usize);
+                    neighbs.push((nnode, v));
+                }
+            }
+            neighbs
+        }
+
+        fn mark_visited_distance(
+            &mut self,
+            node: Self::Node,
+            distance: usize,
+            previous: Option<Self::Node>,
+        ) {
+            self.path.set(node.0, node.1, (distance, previous));
+        }
+    }
+
+    fn fill_backward_path(path: &mut Grid<char>, full: &Grid<(usize, Option<(usize, usize)>)>) {
+        let mut node = (full.width - 1, full.height - 1);
+        while node != (0, 0) {
+            let follow;
+            let (_, prev) = full.get(node.0, node.1);
+            let c = match prev {
+                None => panic!("Following path from end doesn't reach start"),
+                Some(prev) => {
+                    follow = prev;
+                    if node.0 > prev.0 {
+                        '>'
+                    } else if node.0 < prev.0 {
+                        '<'
+                    } else if node.1 > prev.1 {
+                        'v'
+                    } else if node.1 < prev.1 {
+                        '^'
+                    } else {
+                        '?'
+                    }
+                }
+            };
+            path.set(node.0, node.1, c);
+            node = follow;
+        }
+        path.set(node.0, node.1, 'S');
+    }
+
+    fn grids_equal(g1: &Grid<char>, g2: &Grid<char>) -> bool {
+        if g1.width != g2.width || g1.height != g2.height {
+            return false;
+        }
+
+        for y in 0..g1.height {
+            let r1 = g1.get_row_slice(y);
+            let r2 = g2.get_row_slice(y);
+            if r1 != r2 {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    #[test]
+    fn grid_maze_dijkstra() {
+        let map = vec![
+            "0493432911123",
+            "0195450909123",
+            "2255240909054",
+            "1446580909052",
+            "4546650909036",
+            "1438510909054",
+            "4457809909066",
+            "3637810909053",
+            "4654961909187",
+            "4564672909193",
+            "1224680909193",
+            "2546540909191",
+            "4322671119993",
+        ];
+
+        let pat = vec![
+            "S       ^>>  ",
+            "v>      ^ v  ",
+            " v>>>>> ^ v  ",
+            "      v ^ v  ",
+            "      v ^ v  ",
+            "     <v ^ v  ",
+            "     v  ^ v  ",
+            "     v> ^ v  ",
+            "      v ^ v  ",
+            "      v ^ v  ",
+            "      v ^ v  ",
+            "      v ^ v>>",
+            "      v>>   v",
+        ];
+
+        let expected_d = 48;
+        let mut gb = GridBuilder::<char>::new();
+        for row in pat {
+            let line: Vec<char> = row.chars().collect();
+            gb.append_line(&line);
+        }
+
+        let expected_path = gb.to_grid();
+
+        let mut gb = GridBuilder::<usize>::new();
+        for row in map {
+            gb.append_char_map(row);
+        }
+
+        let costmap = gb.to_grid();
+        let (width, height) = (costmap.width, costmap.height);
+        let mut graph = GridCost {
+            cost: costmap,
+            path: Grid::<(usize, Option<(usize, usize)>)>::new(width, height, (999, None)),
+        };
+
+        let d = dijkstra(&mut graph);
+
+        println!("Map Distance is {d}");
+
+        let mut path = Grid::<char>::new(width, height, ' ');
+        fill_backward_path(&mut path, &graph.path);
+
+        path.pretty_print();
+        assert_eq!(d, expected_d);
+        assert!(grids_equal(&path, &expected_path));
     }
 }
