@@ -105,7 +105,7 @@ impl<T: std::clone::Clone + std::fmt::Display> Grid<T> {
     pub fn pretty_print(&self) {
         eprintln!("[{},{}] = ", self.width, self.height);
         for y in 0..self.height {
-            eprint!("[");
+            eprint!("[ ");
             for x in 0..self.width {
                 eprint!("{} ", self.get(x, y));
             }
@@ -245,6 +245,32 @@ impl GridBuilder<bool> {
 
         self.height += 1;
         self.s.extend_from_slice(&bools);
+    }
+}
+
+impl GridBuilder<usize> {
+    /// Add a new row at the end of the builder, converting
+    /// chars into single digits.
+    /// When it's the first time, this row defines the width
+    /// of the grid. All other rows must have the same width
+    /// else a panic is emitted.
+    pub fn append_char_map(&mut self, line: &str) {
+        let mut digits = Vec::<usize>::with_capacity(self.width);
+        for c in line.chars() {
+            digits.push(c.to_digit(10).unwrap() as usize);
+        }
+        if self.height == 0 {
+            self.width = digits.len();
+        } else if self.width != digits.len() {
+            panic!(
+                "Row of len {} appended to GridBuilder of width {}",
+                digits.len(),
+                self.width
+            );
+        }
+
+        self.height += 1;
+        self.s.extend_from_slice(&digits);
     }
 }
 
