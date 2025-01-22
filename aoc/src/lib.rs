@@ -4,4 +4,5 @@
 
 pub mod args;
 pub mod colors;
+pub mod dijkstra;
 pub mod grid;

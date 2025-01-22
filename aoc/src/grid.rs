@@ -15,8 +15,8 @@ impl<T: std::clone::Clone> Grid<T> {
     /// Allocate the low-level array for this grid with a default value
     pub fn new(width: usize, height: usize, t0: T) -> Self {
         Self {
-            width: width,
-            height: height,
+            width,
+            height,
             s: vec![t0; width * height].into_boxed_slice(),
         }
     }
@@ -26,14 +26,13 @@ impl<T: std::clone::Clone> Grid<T> {
     /// the first one is taken as the "width" of the final grid,
     /// if others are smaller gaps are filled with copies of
     /// the first element found, if they are bigger a panic will occur.
-    pub fn from_vec(v: &Vec<Vec<T>>) -> Self {
+    pub fn from_vec(v: &[Vec<T>]) -> Self {
         let t0 = v[0][0].clone();
         let mut s = Self::new(v[0].len(), v.len(), t0);
 
-        for y in 0..s.height {
-            let row = &v[y];
-            for x in 0..row.len() {
-                s.set(x, y, row[x].clone());
+        for (y,row) in v.iter().enumerate() {
+            for (x, val) in row.iter().enumerate() {
+                s.set(x, y, val.clone());
             }
         }
         s
@@ -105,7 +104,7 @@ impl<T: std::clone::Clone + std::fmt::Display> Grid<T> {
     pub fn pretty_print(&self) {
         eprintln!("[{},{}] = ", self.width, self.height);
         for y in 0..self.height {
-            eprint!("[");
+            eprint!("[ ");
             for x in 0..self.width {
                 eprint!("{} ", self.get(x, y));
             }
@@ -180,6 +179,12 @@ pub struct GridBuilder<T> {
     s: Vec<T>,
 }
 
+impl<T: std::clone::Clone> Default for GridBuilder<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: std::clone::Clone> GridBuilder<T> {
     /// Create an initially empty builder.
     pub fn new() -> Self {
@@ -211,7 +216,7 @@ impl<T: std::clone::Clone> GridBuilder<T> {
 
     /// Convert into the final Grid when nothing else needs appending.
     pub fn to_grid(self) -> Grid<T> {
-        if self.s.len() == 0 {
+        if self.s.is_empty() {
             panic!("GridBuilder is still empty");
         }
         Grid::<T> {
@@ -245,6 +250,32 @@ impl GridBuilder<bool> {
 
         self.height += 1;
         self.s.extend_from_slice(&bools);
+    }
+}
+
+impl GridBuilder<usize> {
+    /// Add a new row at the end of the builder, converting
+    /// chars into single digits.
+    /// When it's the first time, this row defines the width
+    /// of the grid. All other rows must have the same width
+    /// else a panic is emitted.
+    pub fn append_char_map(&mut self, line: &str) {
+        let mut digits = Vec::<usize>::with_capacity(self.width);
+        for c in line.chars() {
+            digits.push(c.to_digit(10).unwrap() as usize);
+        }
+        if self.height == 0 {
+            self.width = digits.len();
+        } else if self.width != digits.len() {
+            panic!(
+                "Row of len {} appended to GridBuilder of width {}",
+                digits.len(),
+                self.width
+            );
+        }
+
+        self.height += 1;
+        self.s.extend_from_slice(&digits);
     }
 }
 

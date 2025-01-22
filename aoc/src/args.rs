@@ -15,5 +15,5 @@ pub fn is_verbose() -> bool {
 }
 
 pub fn has_arg(s: &str) -> bool {
-    env::args().find(|a| a == s).is_some()
+    env::args().any(|a| a == s)
 }
