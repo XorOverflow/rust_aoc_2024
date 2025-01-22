@@ -77,7 +77,7 @@ pub fn dijkstra<T: DijkstraController>(controller: &mut T) -> usize {
 
         // Need to copy it to avoid a immutable borrow from line above to block
         // the mutable borrow of following remove_entry()
-        let shortest_node = shortest_node.0.clone();
+        let shortest_node = *shortest_node.0;
 
         let Some((current_node, (current_distance, previous_node))) =
             unvisited_frontier.remove_entry(&shortest_node)
@@ -85,7 +85,7 @@ pub fn dijkstra<T: DijkstraController>(controller: &mut T) -> usize {
             panic!("Impossible to remove node that was found");
         };
 
-        finalized_nodes.insert(current_node.clone());
+        finalized_nodes.insert(current_node);
         controller.mark_visited_distance(current_node, current_distance, previous_node);
 
         if current_node == target_node {
