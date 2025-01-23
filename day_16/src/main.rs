@@ -130,13 +130,13 @@ fn fill_backward_path(
             panic!("Following path from end doesn't reach start");
         };
         let c = if node.0 > prev.0 {
-            '>'
+            '▶'
         } else if node.0 < prev.0 {
-            '<'
+            '◀'
         } else if node.1 > prev.1 {
-            'v'
+            '▼'
         } else if node.1 < prev.1 {
-            '^'
+            '▲'
         } else {
             '?'
         };
@@ -183,7 +183,7 @@ fn main() {
             .pretty_print_lambda_with_overlay(&path, &|w, c, xy| {
                 if w {
                     // wall
-                    format!("{}#", FG_COLORS[BLUE])
+                    format!("{}░", FG_COLORS[BLUE])
                 } else {
                     let color = if xy == (start.0, start.1) {
                         FG_BRIGHT_COLORS[GREEN]
