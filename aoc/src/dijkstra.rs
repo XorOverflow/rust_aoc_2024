@@ -50,7 +50,7 @@ pub trait DijkstraController {
 
 // FIXME: need to pass controller as mut only to call "mark_visited_distance"
 // which is not really needed
-pub fn dijkstra<T: DijkstraController>(controller: &mut T) -> usize {
+pub fn dijkstra<T: DijkstraController>(controller: &mut T, explore_all: bool) -> usize {
     // List of nodes that have been completely processed and won't be
     // visited again. Used to filter out the return of
     // controller.get_neighbors_distances();
@@ -66,6 +66,8 @@ pub fn dijkstra<T: DijkstraController>(controller: &mut T) -> usize {
     unvisited_frontier.insert(controller.get_starting_node(), (0, None));
 
     let target_node = controller.get_target_node();
+
+    let mut found_distance = None;
 
     // Follow dijkstra algo
     while !unvisited_frontier.is_empty() {
@@ -89,7 +91,10 @@ pub fn dijkstra<T: DijkstraController>(controller: &mut T) -> usize {
         controller.mark_visited_distance(current_node, current_distance, previous_node);
 
         if current_node == target_node {
-            return current_distance;
+            found_distance = Some(current_distance);
+            if !explore_all {
+                return current_distance;
+            }
         }
 
         let neighbors = controller.get_neighbors_distances(&current_node);
@@ -115,9 +120,12 @@ pub fn dijkstra<T: DijkstraController>(controller: &mut T) -> usize {
         }
     }
 
-    eprintln!("Dijkstra algorithm finished exploring all nodes without reaching target !");
-
-    usize::MAX
+    if let Some(found_distance) = found_distance {
+        found_distance
+    } else {
+        eprintln!("Dijkstra algorithm finished exploring all nodes without reaching target !");
+        usize::MAX
+    }
 }
 
 #[cfg(test)]
@@ -198,7 +206,7 @@ mod test {
             path: HashMap::<usize, usize>::new(),
         };
 
-        let d = dijkstra(&mut graph);
+        let d = dijkstra(&mut graph, false);
 
         assert_eq!(d, expected_d);
         assert_eq!(graph.path, expected_paths);
@@ -348,7 +356,7 @@ mod test {
             path: Grid::<(usize, Option<(usize, usize)>)>::new(width, height, (999, None)),
         };
 
-        let d = dijkstra(&mut graph);
+        let d = dijkstra(&mut graph, true);
 
         println!("Map Distance is {d}");
 
