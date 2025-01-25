@@ -30,7 +30,7 @@ impl<T: std::clone::Clone> Grid<T> {
         let t0 = v[0][0].clone();
         let mut s = Self::new(v[0].len(), v.len(), t0);
 
-        for (y,row) in v.iter().enumerate() {
+        for (y, row) in v.iter().enumerate() {
             for (x, val) in row.iter().enumerate() {
                 s.set(x, y, val.clone());
             }
@@ -82,6 +82,11 @@ impl<T: std::clone::Clone> Grid<T> {
         } else {
             self.s[x + y * self.width] = t;
         }
+    }
+
+    /// Fill the grid by replacing all cells by a single value
+    pub fn fill(&mut self, t: T) {
+        self.s.fill(t);
     }
 }
 
