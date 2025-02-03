@@ -314,6 +314,10 @@ fn main() {
                     }
                 }
             });
+        if aoc::args::is_verbose() {
+            map.pretty_print_bool_half();
+            added_path.pretty_print_bool_half();
+        }
     } // is_debug
 
     eprintln!("Time taken for parsing: {:?}", elapsed_parse);

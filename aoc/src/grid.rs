@@ -160,6 +160,15 @@ impl<T: std::clone::Clone> Grid<T> {
     }
 }
 
+/// Characters to display a 2x2 boolean map.
+/// For 4 booleans arranged as:
+/// 0 1
+/// 2 3
+/// the block character is at index N where the 4 bits of N are '3210'
+const HALF_BLOCKS: [char; 16] = [
+    ' ', '▘', '▝', '▀', '▖', '▌', '▞', '▛', '▗', '▚', '▐', '▜', '▄', '▙', '▟', '█',
+];
+
 impl Grid<bool> {
     /// Pretty-print a boolean array, true maps to '*'
     pub fn pretty_print_bool(&self) {
@@ -168,6 +177,48 @@ impl Grid<bool> {
             eprint!("[");
             for x in 0..self.width {
                 eprint!("{}", if self.get(x, y) { '*' } else { '.' });
+            }
+            eprintln!("]");
+        }
+    }
+
+    /// Pretty-print a boolean array using block elements Unicode chars for compact representation
+    pub fn pretty_print_bool_half(&self) {
+        // The only difficulty here is to handle odd width/height
+        // when setting the values for the border characters,
+        // if we don't want to pay the cost of using checked_get()
+        // for all cells.
+        eprintln!("[{},{}] = ", self.width, self.height);
+        let mut zero_slice = Vec::<bool>::new();
+        for y in 0..(self.height + 1) / 2 {
+            let top = y * 2;
+            let bot = y * 2 + 1;
+            let top_slice = self.get_row_slice(top);
+            let bot_slice;
+            if bot < self.height {
+                bot_slice = self.get_row_slice(bot);
+            } else {
+                zero_slice.resize(self.width, false);
+                bot_slice = &zero_slice;
+            }
+
+            eprint!("[");
+            for x in 0..(self.width + 1) / 2 {
+                let left = x * 2;
+                let right = x * 2 + 1;
+                let b_0 = top_slice[left] as u8;
+                let b_1;
+                let b_2 = bot_slice[left] as u8;
+                let b_3;
+                if right < self.width {
+                    b_1 = top_slice[right] as u8;
+                    b_3 = bot_slice[right] as u8;
+                } else {
+                    b_1 = 0;
+                    b_3 = 0;
+                }
+                let index = b_0 | (b_1 << 1) | (b_2 << 2) | (b_3 << 3);
+                eprint!("{}", HALF_BLOCKS[index as usize]);
             }
             eprintln!("]");
         }
