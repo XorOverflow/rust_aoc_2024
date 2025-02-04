@@ -169,6 +169,57 @@ const HALF_BLOCKS: [char; 16] = [
     ' ', '▘', '▝', '▀', '▖', '▌', '▞', '▛', '▗', '▚', '▐', '▜', '▄', '▙', '▟', '█',
 ];
 
+// A similar table for braille would be 256 character long.
+// Too annoying to type and order properly by hand, this is done
+// dynamically by a convesion function (It could be made into a macro maybe)
+
+// Note 1: the first char is not a space but braille 0x2800 "dots-0", for consistency.
+// Note 2: Due to the split in unicode between the 2x3 and the 2x4 patterns, there is
+// not clean binary progression. So I kept the numbering style of HALF_BLOCK (bits increase
+// first on the X axis) instead of mapping directly the braille order (bits increase
+// first on the Y axis until the 3rd/6th bit, and the 7/8th bit are horizontal in a different block)
+// https://en.wikipedia.org/wiki/Braille_Patterns#Block
+/*
+For reference, the "original" order
+6-dots block
+'⠀','⠁','⠂','⠃','⠄','⠅','⠆','⠇','⠈','⠉','⠊','⠋','⠌','⠍','⠎','⠏',
+'⠐','⠑','⠒','⠓','⠔','⠕','⠖','⠗','⠘','⠙','⠚','⠛','⠜','⠝','⠞','⠟',
+'⠠','⠡','⠢','⠣','⠤','⠥','⠦','⠧','⠨','⠩','⠪','⠫','⠬','⠭','⠮','⠯',
+'⠰','⠱','⠲','⠳','⠴','⠵','⠶','⠷','⠸','⠹','⠺','⠻','⠼','⠽','⠾','⠿',
+8-dots block
+7
+'⡀','⡁','⡂','⡃','⡄','⡅','⡆','⡇','⡈','⡉','⡊','⡋','⡌','⡍','⡎','⡏',
+'⡐','⡑','⡒','⡓','⡔','⡕','⡖','⡗','⡘','⡙','⡚','⡛','⡜','⡝','⡞','⡟',
+'⡠','⡡','⡢','⡣','⡤','⡥','⡦','⡧','⡨','⡩','⡪','⡫','⡬','⡭','⡮','⡯',
+'⡰','⡱','⡲','⡳','⡴','⡵','⡶','⡷','⡸','⡹','⡺','⡻','⡼','⡽','⡾','⡿',
+8
+'⢀','⢁','⢂','⢃','⢄','⢅','⢆','⢇','⢈','⢉','⢊','⢋','⢌','⢍','⢎','⢏',
+'⢐','⢑','⢒','⢓','⢔','⢕','⢖','⢗','⢘','⢙','⢚','⢛','⢜','⢝','⢞','⢟',
+'⢠','⢡','⢢','⢣','⢤','⢥','⢦','⢧','⢨','⢩','⢪','⢫','⢬','⢭','⢮','⢯',
+'⢰','⢱','⢲','⢳','⢴','⢵','⢶','⢷','⢸','⢹','⢺','⢻','⢼','⢽','⢾','⢿',
+78
+'⣀','⣁','⣂','⣃','⣄','⣅','⣆','⣇','⣈','⣉','⣊','⣋','⣌','⣍','⣎','⣏',
+'⣐','⣑','⣒','⣓','⣔','⣕','⣖','⣗','⣘','⣙','⣚','⣛','⣜','⣝','⣞','⣟',
+'⣠','⣡','⣢','⣣','⣤','⣥','⣦','⣧','⣨','⣩','⣪','⣫','⣬','⣭','⣮','⣯',
+'⣰','⣱','⣲','⣳','⣴','⣵','⣶','⣷','⣸','⣹','⣺','⣻','⣼','⣽','⣾','⣿'
+*/
+
+/// Use the bit representation of the Unicode Braille Block for
+/// conversion instead of mapping into a table.
+#[inline]
+fn u8_to_braille(v: u8) -> char {
+    let base: u32 = 0x2800;
+    let v6 = v & 0b00111111;
+    // bit 0 stay at "dot 1", bit 1 becomes "dot 4", bit 2 becomes "dot 2",
+    // bit 3 becomes "dot 5", bit 4 becomes "dot 3" and bit 5 stays at "dot 6"
+    let dot6 =
+        (v6 & 1) | (v6 & 2) << 2 | (v6 & 4) >> 1 | (v6 & 8) << 1 | (v6 & 16) >> 2 | (v6 & 32);
+    // bit 6 is "dot 7", bit 7 is "dot 8", which are unchanged bit positions.
+    let dot8 = dot6 | (v & 0b11000000);
+    let braille = base + dot8 as u32;
+    char::from_u32(braille).unwrap()
+}
+
 impl Grid<bool> {
     /// Pretty-print a boolean array, true maps to '*'
     pub fn pretty_print_bool(&self) {
@@ -219,6 +270,74 @@ impl Grid<bool> {
                 }
                 let index = b_0 | (b_1 << 1) | (b_2 << 2) | (b_3 << 3);
                 eprint!("{}", HALF_BLOCKS[index as usize]);
+            }
+            eprintln!("]");
+        }
+    }
+
+    /// Pretty-print a boolean array using braille Unicode chars for
+    /// even more compact representation
+    pub fn pretty_print_bool_micro(&self) {
+        eprintln!("[{},{}] = ", self.width, self.height);
+        let mut zero_slice = Vec::<bool>::new();
+        zero_slice.resize(self.width, false);
+        for y in 0..(self.height + 3) / 4 {
+            let t0 = y * 4;
+            let t1 = y * 4 + 1;
+            let t2 = y * 4 + 2;
+            let t3 = y * 4 + 3;
+            let slice0 = self.get_row_slice(t0);
+            let slice1;
+            let slice2;
+            let slice3;
+            if t1 < self.height {
+                slice1 = self.get_row_slice(t1);
+            } else {
+                slice1 = &zero_slice;
+            }
+            if t2 < self.height {
+                slice2 = self.get_row_slice(t2);
+            } else {
+                slice2 = &zero_slice;
+            }
+            if t3 < self.height {
+                slice3 = self.get_row_slice(t3);
+            } else {
+                slice3 = &zero_slice;
+            }
+
+            eprint!("[");
+            for x in 0..(self.width + 1) / 2 {
+                let left = x * 2;
+                let right = x * 2 + 1;
+                let b_0 = slice0[left] as u8;
+                let b_1;
+                let b_2 = slice1[left] as u8;
+                let b_3;
+                let b_4 = slice2[left] as u8;
+                let b_5;
+                let b_6 = slice3[left] as u8;
+                let b_7;
+                if right < self.width {
+                    b_1 = slice0[right] as u8;
+                    b_3 = slice1[right] as u8;
+                    b_5 = slice2[right] as u8;
+                    b_7 = slice3[right] as u8;
+                } else {
+                    b_1 = 0;
+                    b_3 = 0;
+                    b_5 = 0;
+                    b_7 = 0;
+                }
+                let index = b_0
+                    | (b_1 << 1)
+                    | (b_2 << 2)
+                    | (b_3 << 3)
+                    | (b_4 << 4)
+                    | (b_5 << 5)
+                    | (b_6 << 6)
+                    | (b_7 << 7);
+                eprint!("{}", u8_to_braille(index));
             }
             eprintln!("]");
         }
@@ -415,5 +534,32 @@ mod test {
         });
 
         grid.pretty_print_lambda(&|e: Elmt| format!("{:02}_{}|", e.v, e.dir));
+    }
+
+    #[test]
+    fn grid_braille_pattern() {
+        assert_ne!(u8_to_braille(0), ' '); // we do NOT expect a 0x20 space
+        assert_eq!(u8_to_braille(0), '\u{2800}'); // but the dots-0 braille character
+
+        assert_eq!(u8_to_braille(255), '⣿');
+
+        // single bits to dots-1 -- dot-8
+        assert_eq!(u8_to_braille(0b00000001), '⠁');
+        assert_eq!(u8_to_braille(0b00000010), '⠈');
+        assert_eq!(u8_to_braille(0b00000100), '⠂');
+        assert_eq!(u8_to_braille(0b00001000), '⠐');
+        assert_eq!(u8_to_braille(0b00010000), '⠄');
+        assert_eq!(u8_to_braille(0b00100000), '⠠');
+        assert_eq!(u8_to_braille(0b01000000), '⡀');
+        assert_eq!(u8_to_braille(0b10000000), '⢀');
+
+        assert_eq!(u8_to_braille(0b10110111), '⢯');
+
+        assert_eq!(u8_to_braille(0b01100110), '⡪');
+
+        assert_eq!(u8_to_braille(0b10011001), '⢕');
+
+        assert_eq!(u8_to_braille(0b01010101), '⡇');
+        assert_eq!(u8_to_braille(0b10101010), '⢸');
     }
 }

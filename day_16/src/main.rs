@@ -265,6 +265,8 @@ fn main() {
     let elapsed_process: Duration = Instant::now() - start_process; // Calculate elapsed time.
 
     if aoc::args::is_debug() {
+        let start_print = Instant::now(); // Start measuring time.
+
         let mut path = Grid::<char>::new(width, height, ' ');
         let start = graph.get_starting_node();
         let target = graph.get_target_node();
@@ -317,7 +319,13 @@ fn main() {
         if aoc::args::is_verbose() {
             map.pretty_print_bool_half();
             added_path.pretty_print_bool_half();
+
+            map.pretty_print_bool_micro();
+            added_path.pretty_print_bool_micro();
         }
+
+        let elapsed_print: Duration = Instant::now() - start_print;
+        eprintln!("Time taken for debug print: {:?}", elapsed_print);
     } // is_debug
 
     eprintln!("Time taken for parsing: {:?}", elapsed_parse);
