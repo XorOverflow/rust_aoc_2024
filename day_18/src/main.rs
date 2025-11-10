@@ -4,7 +4,7 @@ https://adventofcode.com/2024/day/18
  */
 
 use aoc::dijkstra::*;
-use aoc::grid::Grid;
+use aoc::grid::{Grid, GridBuilder};
 use std::io;
 use std::io::prelude::*;
 use std::str::FromStr;
@@ -12,15 +12,19 @@ use std::time::{Duration, Instant};
 
 #[derive(Clone)]
 struct Maze {
-    // Original, read-only map of the input data
-    map: Grid<bool>,
+    // Original, read-only map of the input data.
+    // The value is "0" for empty cell, or a positive
+    // "generation" which is the order of the
+    // "corrupted byte" falling on the RAM zone.
+    map: Grid<u16>,
     paths: Grid<Option<(isize, isize)>>,
     start: (isize, isize),
     exit: (isize, isize),
+    generation: u16,
 }
 
 impl Maze {
-    fn new_from_map(map: &Grid<bool>) -> Self {
+    fn new_from_map(map: &Grid<u16>) -> Self {
         let (width, height) = (map.width, map.height);
         let start = (0, 0);
         let exit = (width as isize - 1, height as isize - 1);
@@ -30,7 +34,26 @@ impl Maze {
             paths: Grid::<Option<(isize, isize)>>::new(width, height, None),
             start,
             exit,
+            generation: 0,
         }
+    }
+    fn set_generation(&mut self, gen: u16) {
+        self.generation = gen;
+        self.paths.fill(None);
+    }
+
+    fn get_bool_map_from_generation(&self) -> Grid<bool> {
+        let mut bool_builder = GridBuilder::<bool>::new();
+        for y in 0..self.map.height {
+            let bools: Vec<bool> = self
+                .map
+                .get_row_slice(y)
+                .iter()
+                .map(|gen| *gen <= self.generation)
+                .collect();
+            bool_builder.append_line(&bools);
+        }
+        bool_builder.to_grid()
     }
 }
 
@@ -52,8 +75,16 @@ impl DijkstraController for Maze {
         for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
             match self.map.checked_get(x + dx, y + dy) {
                 None => (),
-                Some(true) => (),
-                Some(false) => neighbs.push(((x + dx, y + dy), 1)),
+                Some(gen) => {
+                    if gen > self.generation {
+                        // If a corrupted byte is created later
+                        // than the current generation we consider,
+                        // it's as if it is not here.
+                        neighbs.push(((x + dx, y + dy), 1));
+                    } else {
+                        ()
+                    }
+                }
             }
         }
 
@@ -72,33 +103,34 @@ impl DijkstraController for Maze {
 
 fn main() {
     // ----
-    let start_parse = Instant::now(); // Start measuring time.
-    let mut map = Grid::<bool>::new(71, 71, false);
-    let mut map_full = Grid::<bool>::new(71, 71, false);
-    let mut count_bytes = 0;
-    let mut max_bytes_part_1 = 12;
+    let start_parse = Instant::now();
+    // To simplify algo, "empty" cells (non corrupted)
+    // are represented as "infinite" generation number
+    // instead of 0.
+    // This way, "cell is free <==> cell > tested_generation"
+    // without any special case for 0.
+    let mut map = Grid::<u16>::new(71, 71, u16::MAX);
+    let mut generation: u16 = 0;
+    let mut max_generation = 12;
 
     let mut lines = io::stdin().lock().lines();
     let mut max_coord = 0;
 
+    // Parse the input and fill the map by recording
+    // the order each cell is corrupted ("generation")
     while let Some(Ok(line)) = lines.next() {
         if let Some((x, y)) = line.split_once(',') {
             let x = usize::from_str(x).unwrap();
             let y = usize::from_str(y).unwrap();
-            map_full.set(x, y, true);
+            generation += 1;
+            map.set(x, y, generation);
 
             // Distinguish samples and actual prod input,
             // for different algo parameters
             max_coord = std::cmp::max(max_coord, x);
             max_coord = std::cmp::max(max_coord, y);
             if max_coord > 6 {
-                max_bytes_part_1 = 1024;
-            }
-
-            // Part 1 only need to take the first "kilobyte" of corrupted coordinates.
-            count_bytes += 1;
-            if count_bytes <= max_bytes_part_1 {
-                map.set(x, y, true);
+                max_generation = 1024;
             }
         } else {
             panic!("invalid input format {line}");
@@ -107,7 +139,7 @@ fn main() {
 
     if max_coord <= 6 {
         println!("Using 'sample' small coordinates");
-        let mut map2 = Grid::<bool>::new(7, 7, false);
+        let mut map2 = Grid::<u16>::new(7, 7, 0);
         for x in 0..7 {
             for y in 0..7 {
                 map2.set(x, y, map.get(x, y));
@@ -122,10 +154,13 @@ fn main() {
     let start_process = Instant::now(); // Start measuring time.
 
     let mut maze = Maze::new_from_map(&map);
+    maze.set_generation(max_generation);
+
     let distance = dijkstra(&mut maze, false);
     if aoc::args::is_verbose() {
-        map.pretty_print_bool_half();
-        println!("shortest path:");
+        let generation_map = maze.get_bool_map_from_generation();
+        generation_map.pretty_print_bool_half();
+        println!("shortest path at generation {max_generation}:");
         // Reconstruct (one of the possible) shortest path by walking back from the exit
         // on the finalized nodes set on the dijkstracontroller
         let mut shortpath = Grid::<bool>::new(maze.map.width, maze.map.height, false);
