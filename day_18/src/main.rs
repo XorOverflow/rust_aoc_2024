@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 struct Maze {
     // Original, read-only map of the input data
     map: Grid<bool>,
-    path: Grid<bool>,
+    paths: Grid<Option<(isize, isize)>>,
     start: (isize, isize),
     exit: (isize, isize),
 }
@@ -27,7 +27,7 @@ impl Maze {
 
         Maze {
             map: map.clone(),
-            path: Grid::<bool>::new(width, height, false),
+            paths: Grid::<Option<(isize, isize)>>::new(width, height, None),
             start,
             exit,
         }
@@ -64,9 +64,9 @@ impl DijkstraController for Maze {
         &mut self,
         node: Self::Node,
         _distance: usize,
-        _previous: Option<Self::Node>,
+        previous: Option<Self::Node>,
     ) {
-        self.path.set(node.0 as usize, node.1 as usize, true);
+        self.paths.set(node.0 as usize, node.1 as usize, previous);
     }
 }
 
@@ -125,6 +125,16 @@ fn main() {
     let distance = dijkstra(&mut maze, false);
     if aoc::args::is_verbose() {
         map.pretty_print_bool_half();
+        println!("shortest path:");
+        // Reconstruct (one of the possible) shortest path by walking back from the exit
+        // on the finalized nodes set on the dijkstracontroller
+        let mut shortpath = Grid::<bool>::new(maze.map.width, maze.map.height, false);
+        let mut walknode = maze.exit;
+        while let Some(Some(prevnode)) = maze.paths.checked_get(walknode.0, walknode.1) {
+            walknode = prevnode;
+            shortpath.set(walknode.0 as usize, walknode.1 as usize, true);
+        }
+        shortpath.pretty_print_bool_half();
     }
 
     println!("Part 1 = {}", distance);
