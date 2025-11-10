@@ -110,6 +110,7 @@ fn main() {
     // This way, "cell is free <==> cell > tested_generation"
     // without any special case for 0.
     let mut map = Grid::<u16>::new(71, 71, u16::MAX);
+    let mut coords = Vec::<(usize, usize)>::new();
     let mut generation: u16 = 0;
     let mut max_generation = 12;
 
@@ -124,6 +125,7 @@ fn main() {
             let y = usize::from_str(y).unwrap();
             generation += 1;
             map.set(x, y, generation);
+            coords.push((x, y));
 
             // Distinguish samples and actual prod input,
             // for different algo parameters
@@ -150,7 +152,7 @@ fn main() {
 
     let elapsed_parse: Duration = Instant::now() - start_parse; // Calculate elapsed time.
 
-    // ----
+    // ---- Part 1
     let start_process = Instant::now(); // Start measuring time.
 
     let mut maze = Maze::new_from_map(&map);
@@ -173,6 +175,65 @@ fn main() {
     }
 
     println!("Part 1 = {}", distance);
+
+    // ---- Part 2
+
+    // Dichotomize the generation to find blocking/non blocking states.
+    // "bisect_prev" is not blocking, and "bisect_next" is blocking.
+    // expect from the problem input that the starting generation (12 or 1024)
+    // is never blocking, and the final generation is always blocking.
+    let mut bisect_prev = max_generation;
+    let mut bisect_next = generation;
+
+    if aoc::args::is_debug() {
+        println!(
+            "Starting bisecting to find blocking gen, between {bisect_prev} and {bisect_next}"
+        );
+    }
+
+    while bisect_next > bisect_prev + 1 {
+        let bisect_test;
+        if bisect_next > bisect_prev + 2 {
+            bisect_test = (bisect_prev + bisect_next) / 2;
+        } else {
+            bisect_test = bisect_prev + 1;
+        }
+        if aoc::args::is_debug() {
+            println!("bisect: {bisect_test}");
+        }
+        maze.set_generation(bisect_test);
+        let test_distance = dijkstra(&mut maze, false);
+
+        if test_distance == usize::MAX {
+            if aoc::args::is_debug() {
+                println!("bisect: Maze was impossible to solve at generation {bisect_test}");
+            }
+
+            // Bisect: found "bad"
+            bisect_next = bisect_test;
+        } else {
+            if aoc::args::is_debug() {
+                println!("bisect: Maze was ok to solve at generation {bisect_test}");
+            }
+            // Bisect: found "good"
+            bisect_prev = bisect_test;
+        }
+    }
+
+    if bisect_next == bisect_prev + 1 {
+        // Found the exact blocking generation
+        let blocking_cell = coords.get((bisect_next - 1) as usize); // array is 0-indexed
+        if aoc::args::is_debug() {
+            println!(
+                "Part 2: Maze was blocked on generation {bisect_next} at cell coordinate {:?}",
+                blocking_cell
+            );
+        }
+        let coordinates = blocking_cell.unwrap();
+        println!("Part 2: {},{}", coordinates.0, coordinates.1);
+    } else {
+        panic!("Part2 : bisect didn't converge");
+    }
 
     let elapsed_process: Duration = Instant::now() - start_process; // Calculate elapsed time.
 
